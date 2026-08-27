@@ -1,0 +1,50 @@
+{
+  "_meta": {
+    "fonte": "Figma — Projeto Automação (GHKmjoFwGCUuUDjhhvXVB9), extraído em 2026-08-20",
+    "uso": "Conjunto válido para o sorteio aleatório de cor do template Salesjobs. Cada execução sorteia UMA combinação inteira (random.choice), nunca cores avulsas.",
+    "dimensoes_arte": "1200x1500 (formato do Figma; atende o mínimo de 1080px do card)",
+    "fonte_tipografica": "Open Sans (Regular 400, SemiBold 600, Bold 700) — Google Fonts"
+  },
+  "combinacoes": [
+    {
+      "id": "fundo_verde_letra_branca",
+      "fundo": "linear-gradient(115deg, #0DF495 0%, #0CF092 29%, #08D782 77%, #05C375 100%)",
+      "texto": "#FFFFFF",
+      "pill_fundo": "#FFFFFF",
+      "pill_texto": "#05C375",
+      "elipse": "#0DF495",
+      "card_logo_fundo": "#FFFFFF",
+      "borda_logo_empresa": "#FFFFFF"
+    },
+    {
+      "id": "fundo_azul_letra_branca",
+      "fundo": "linear-gradient(115deg, #22A8C1 0%, #39BFD0 22%, #45CBD8 40%, #4ED3DD 55%, #53D8E0 68%, #59DEE4 85%, #5CE1E6 100%)",
+      "texto": "#FFFFFF",
+      "pill_fundo": "#FFFFFF",
+      "pill_texto": "#50CBD2",
+      "elipse": "#50CBD2",
+      "card_logo_fundo": "#FFFFFF",
+      "borda_logo_empresa": "#44B2BB"
+    },
+    {
+      "id": "fundo_branco_letra_azul",
+      "fundo": "#FFFFFF",
+      "texto": "#1399B8",
+      "pill_fundo": "#1399B8",
+      "pill_texto": "#FFFFFF",
+      "elipse": "#FFFFFF",
+      "card_logo_fundo": "linear-gradient(135deg, #5CE1E6 0%, #46CBD8 35%, #39BFD0 65%, #1399B8 100%)",
+      "borda_logo_empresa": "#1399B8"
+    },
+    {
+      "id": "fundo_branco_letra_verde",
+      "fundo": "#FFFFFF",
+      "texto": "#05C375",
+      "pill_fundo": "#05C375",
+      "pill_texto": "#FFFFFF",
+      "elipse": "#FFFFFF",
+      "card_logo_fundo": "linear-gradient(135deg, #0DF495 0%, #09DC85 50%, #05C375 100%)",
+      "borda_logo_empresa": "#05C375"
+    }
+  ]
+}

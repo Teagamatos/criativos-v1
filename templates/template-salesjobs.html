@@ -1,0 +1,175 @@
+<!DOCTYPE html>
+<!--
+  Template Salesjobs — capturado do Figma "Projeto Automação" (frames SL, 1200×1500)
+
+  Placeholders (padrão string-replace do repo mvp-arte):
+    {{CARGO}}               título da vaga
+    {{LOCALIDADES_HTML}}    um <span class="pill">Cidade, UF</span> por localização
+    {{FOTO_URL}}            foto da pessoa (busca dinâmica na Pexels)
+    {{LOGO_EMPRESA_URL}}    logo da contratante (vem no payload de /generate)
+    {{LOGO_EMPRESA_W}} {{LOGO_EMPRESA_H}}  tamanho final da logo em px (calculado
+                            em render.py, tipo "contain" dentro de 303×189)
+    {{LOGO_SALESJOBS_URL}}  logo salesjobs do rodapé (asset fixo)
+    {{MODO_SIGILOSA}}       "sigilosa" ou "" — oculta o logo da contratante
+    {{COR_FUNDO}} {{COR_TEXTO}} {{COR_PILL_FUNDO}} {{COR_PILL_TEXTO}}
+    {{COR_ELIPSE}} {{COR_CARD_LOGO}} {{COR_BORDA_LOGO}}
+                            vindos de UMA combinação sorteada em paleta-salesjobs.json
+-->
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+<link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
+<style>
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  html, body { width: 1200px; height: 1500px; }
+  body { font-family: 'Open Sans', sans-serif; }
+
+  .arte {
+    position: relative;
+    width: 1200px; height: 1500px;
+    overflow: hidden;
+    background: {{COR_FUNDO}};
+  }
+
+  /* ── Foto: círculo gigante estourando o topo/direita ──
+     .foto-circulo e .elipse são CÍRCULOS CONCÊNTRICOS (mesmo centro:
+     left+width/2 e top+height/2 idênticos nos dois), só o raio (.elipse
+     menor) muda. Isso cria um anel de largura constante — a faixa de foto
+     visível entre os dois círculos não varia do topo até a base. Não mude
+     um dos dois sem recalcular o outro pra manter o mesmo centro. */
+  .foto-circulo {
+    position: absolute; left: 606px; top: -139px;
+    width: 1033px; height: 1033px;
+    border-radius: 50%;
+    overflow: hidden;
+  }
+  .foto-circulo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
+
+  /* ── Elipse de acento por cima da foto (cria o recorte em "C") ── */
+  .elipse {
+    position: absolute; left: 867px; top: 122px;
+    width: 511px; height: 511px;
+    border-radius: 50%;
+    background: {{COR_ELIPSE}};
+  }
+
+  /* ── Logo da empresa contratante — topo esquerdo; some na sigilosa ──
+     A moldura (fundo/borda/sombra) vai no <img>, com largura/altura exatas
+     calculadas em render.py (tipo "contain" dentro de 303×189, preservando
+     a proporção real da logo) — assim o cartão abraça o contorno da logo,
+     em vez de uma caixa fixa maior que sobra espaço vazio ao redor. */
+  .logo-empresa { position: absolute; left: 95px; top: 139px; }
+  .logo-empresa img {
+    display: block;
+    padding: 14px;
+    background: #ffffff;
+    border: 1px solid #e0e0e0;
+    box-shadow: -4px 4px 8px rgba(189, 189, 189, 0.6);
+    box-sizing: content-box;
+  }
+  .arte.sigilosa .logo-empresa { display: none; }
+
+  /* ── Fundo colorido: a logo já vem com fundo branco embutido na própria
+     imagem — o cartão vira um efeito "vidro" (fundo translúcido + blur do que
+     está atrás), em vez do preenchimento branco sólido. Fundo branco não usa isso. */
+  .arte.fundo-colorido .logo-empresa img {
+    background: rgba(255, 255, 255, 0.14);
+    backdrop-filter: blur(14px) saturate(140%);
+    -webkit-backdrop-filter: blur(14px) saturate(140%);
+    border: 1px solid rgba(255, 255, 255, 0.4);
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
+  }
+
+  /* ── Card de apoio à direita (elemento fixo do design) ── */
+  .card-direito {
+    position: absolute; left: 906px; top: 1013px;
+    width: 319px; height: 189px;
+    background: {{COR_CARD_LOGO}};
+    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+  }
+
+  /* ── Bloco de texto ── */
+  .conteudo { position: absolute; left: 111px; top: 560px; width: 600px; }
+
+  .vaga-label {
+    font-weight: 400; font-size: 71px; line-height: 1.35;
+    color: {{COR_TEXTO}};
+  }
+  .cargo {
+    font-weight: 700; font-size: 89px;
+    letter-spacing: -0.09em; line-height: 0.994;
+    color: {{COR_TEXTO}};
+    max-width: 560px;
+    padding-top: 14px;
+  }
+  .localidades {
+    margin-top: 40px;
+    display: flex; flex-wrap: wrap; gap: 18px;
+    max-width: 560px;
+  }
+  .pill {
+    display: inline-flex; align-items: center;
+    background: {{COR_PILL_FUNDO}};
+    color: {{COR_PILL_TEXTO}};
+    font-weight: 600; font-size: 39px; line-height: 1;
+    padding: 9px 28px;
+    border-radius: 999px;
+    white-space: nowrap;
+  }
+
+  /* ── Rodapé: logo salesjobs centralizado ── */
+  .rodape {
+    position: absolute; left: 0; bottom: 70px; width: 1200px;
+    display: flex; justify-content: center;
+  }
+  .rodape img { height: 48px; }
+</style>
+</head>
+<body>
+  <div class="arte {{MODO_SIGILOSA}} {{MODO_FUNDO_COLORIDO}}">
+    <div class="foto-circulo"><img src="{{FOTO_URL}}" alt=""></div>
+    <div class="elipse"></div>
+    <div class="card-direito"></div>
+    {% if LOGO_EMPRESA_URL %}
+    <div class="logo-empresa">
+      <img src="{{LOGO_EMPRESA_URL}}" alt="" style="width:{{LOGO_EMPRESA_W}}px;height:{{LOGO_EMPRESA_H}}px;">
+    </div>
+    {% endif %}
+    <div class="conteudo">
+      <div class="vaga-label">VAGA</div>
+      <h1 class="cargo">{{CARGO}}</h1>
+      <div class="localidades">{{LOCALIDADES_HTML}}</div>
+    </div>
+    <div class="rodape"><img src="{{LOGO_SALESJOBS_URL}}" alt="salesjobs"></div>
+  </div>
+
+  <script>
+    // Auto-ajuste (padrão do repo): roda após as fontes carregarem.
+    // 1) Cargo: encolhe a fonte até caber em no máx. 3 linhas dentro da coluna.
+    // 2) Localidades: encolhe as pills até o bloco não invadir a área da foto/card.
+    document.fonts.ready.then(() => {
+      const cargo = document.querySelector('.cargo');
+      let fs = 89;
+      const maxAltura = 3 * 89; // ~3 linhas no tamanho original
+      while (cargo.scrollHeight > maxAltura && fs > 44) {
+        fs -= 2;
+        cargo.style.fontSize = fs + 'px';
+      }
+
+      const locs = document.querySelector('.localidades');
+      const pills = [...locs.querySelectorAll('.pill')];
+      if (pills.length) {
+        let pfs = 39;
+        const limiteInferior = 1180; // não pode encostar na área do rodapé
+        const passa = () => locs.getBoundingClientRect().bottom <= limiteInferior;
+        while (!passa() && pfs > 22) {
+          pfs -= 1.5;
+          pills.forEach(p => p.style.fontSize = pfs + 'px');
+        }
+      }
+    });
+  </script>
+</body>
+</html>

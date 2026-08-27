@@ -1,0 +1,9 @@
+.env
+state.db
+service-account.json
+__pycache__/
+*.pyc
+.venv/
+.idea/
+*.png
+tests/payloads/*.json

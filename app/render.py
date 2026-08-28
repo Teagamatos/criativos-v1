@@ -21,17 +21,23 @@ _browser: Browser | None = None
 _pw = None
 
 
-# Área máxima reservada pra logo no template (topo esquerdo) — a moldura
-# (fundo/borda/sombra) é desenhada exatamente no tamanho final da imagem
-# (calculado aqui, tipo "contain"), não numa caixa fixa maior que a logo.
+# Área máxima reservada pra logo no template (topo esquerdo), valor do Figma —
+# a moldura (padding + borda do CSS) soma por cima da imagem (box-sizing:
+# content-box), então descontamos esse espaço antes do "contain" pra imagem
+# + padding + borda fecharem exatamente em 303×165, não ultrapassar.
 _LOGO_MAX_W = 303
-_LOGO_MAX_H = 189
+_LOGO_MAX_H = 165
+_LOGO_PADDING = 14
+_LOGO_BORDA = 1
 
 
 def _logo_tamanho(logo_empresa: dict | None) -> tuple[int, int] | None:
     if not logo_empresa:
         return None
-    escala = min(_LOGO_MAX_W / logo_empresa["largura"], _LOGO_MAX_H / logo_empresa["altura"])
+    espaco = 2 * (_LOGO_PADDING + _LOGO_BORDA)  # dos dois lados somados
+    largura_disponivel = _LOGO_MAX_W - espaco
+    altura_disponivel = _LOGO_MAX_H - espaco
+    escala = min(largura_disponivel / logo_empresa["largura"], altura_disponivel / logo_empresa["altura"])
     return round(logo_empresa["largura"] * escala), round(logo_empresa["altura"] * escala)
 
 

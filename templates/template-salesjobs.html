@@ -40,8 +40,8 @@
      visível entre os dois círculos não varia do topo até a base. Não mude
      um dos dois sem recalcular o outro pra manter o mesmo centro. */
   .foto-circulo {
-    position: absolute; left: 606px; top: -139px;
-    width: 1033px; height: 1033px;
+    position: absolute; left: 600px; top: -21px;
+    width: 1039.22px; height: 959.96px;
     border-radius: 50%;
     overflow: hidden;
   }
@@ -49,8 +49,8 @@
 
   /* ── Elipse de acento por cima da foto (cria o recorte em "C") ── */
   .elipse {
-    position: absolute; left: 867px; top: 122px;
-    width: 511px; height: 511px;
+    position: absolute; left: 867px; top: 139.39px;
+    width: 696.31px; height: 629.26px;
     border-radius: 50%;
     background: {{COR_ELIPSE}};
   }
@@ -64,23 +64,11 @@
   .logo-empresa img {
     display: block;
     padding: 14px;
-    background: #ffffff;
-    border: 1px solid #e0e0e0;
-    box-shadow: -4px 4px 8px rgba(189, 189, 189, 0.6);
+    border: 1px solid {{COR_BORDA_LOGO}};
+    box-shadow: -2px 2px 0px 3px rgba(0, 0, 0, 0.25);
     box-sizing: content-box;
   }
   .arte.sigilosa .logo-empresa { display: none; }
-
-  /* ── Fundo colorido: a logo já vem com fundo branco embutido na própria
-     imagem — o cartão vira um efeito "vidro" (fundo translúcido + blur do que
-     está atrás), em vez do preenchimento branco sólido. Fundo branco não usa isso. */
-  .arte.fundo-colorido .logo-empresa img {
-    background: rgba(255, 255, 255, 0.14);
-    backdrop-filter: blur(14px) saturate(140%);
-    -webkit-backdrop-filter: blur(14px) saturate(140%);
-    border: 1px solid rgba(255, 255, 255, 0.4);
-    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.18);
-  }
 
   /* ── Card de apoio à direita (elemento fixo do design) ── */
   .card-direito {
@@ -106,7 +94,7 @@
   }
   .localidades {
     margin-top: 40px;
-    display: flex; flex-wrap: wrap; gap: 18px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 18px;
     max-width: 560px;
   }
   .pill {

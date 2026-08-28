@@ -3,6 +3,8 @@
 Viewport 1200×1500 (formato do Figma; atende o mínimo de 1080px do card).
 RENDER_SCALE > 1 usa device_scale_factor para subir a resolução sem tocar no CSS.
 """
+import re
+
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markupsafe import Markup
 from playwright.async_api import Browser, async_playwright
@@ -35,7 +37,8 @@ def _logo_tamanho(logo_empresa: dict | None) -> tuple[int, int] | None:
 
 def montar_html(vaga: dict, combinacao: dict, foto_uri: str, logo_empresa: dict | None, sigilosa: bool) -> str:
     pills = Markup("").join(
-        Markup('<span class="pill">{}</span>').format(loc) for loc in vaga["localizacoes"]
+        Markup('<span class="pill">{}</span>').format(re.sub(r",\s*", " | ", loc))
+        for loc in vaga["localizacoes"]
     )
     tamanho = _logo_tamanho(logo_empresa)
     fundo_colorido = combinacao["fundo"] != "#FFFFFF"

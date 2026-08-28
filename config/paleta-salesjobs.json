@@ -14,7 +14,7 @@
       "pill_texto": "#05C375",
       "elipse": "#0DF495",
       "card_logo_fundo": "#FFFFFF",
-      "borda_logo_empresa": "#FFFFFF"
+      "borda_logo_empresa": "#0DF495"
     },
     {
       "id": "fundo_azul_letra_branca",
@@ -34,7 +34,7 @@
       "pill_texto": "#FFFFFF",
       "elipse": "#FFFFFF",
       "card_logo_fundo": "linear-gradient(135deg, #5CE1E6 0%, #46CBD8 35%, #39BFD0 65%, #1399B8 100%)",
-      "borda_logo_empresa": "#1399B8"
+      "borda_logo_empresa": "rgba(255,255,255,0.07)"
     },
     {
       "id": "fundo_branco_letra_verde",
@@ -44,7 +44,7 @@
       "pill_texto": "#FFFFFF",
       "elipse": "#FFFFFF",
       "card_logo_fundo": "linear-gradient(135deg, #0DF495 0%, #09DC85 50%, #05C375 100%)",
-      "borda_logo_empresa": "#05C375"
+      "borda_logo_empresa": "rgba(255,255,255,0.07)"
     }
   ]
 }

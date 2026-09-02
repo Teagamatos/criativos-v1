@@ -38,12 +38,12 @@ corpo = html[html.find("<body>"):]
 assert "{{" not in html, "sobrou placeholder sem preencher"
 assert corpo.count('class="pill"') == 3, "faltou pill de localização"
 assert "&lt;Sênior&gt;" in html, "cargo não escapado"
-assert 'class="arte "' in html, "modo normal deveria ter classe vazia"
+assert 'class="arte  ' in corpo and 'sigilosa' not in corpo, "modo normal não deveria ter classe sigilosa"
 assert combo["texto"] in html and "https://tfc/logo.png" in html
-assert "width:303px;height:152px" in html, "logo devia ser escalada tipo contain (limitada pela largura)"
+assert "width:278px;height:139px" in html, "logo devia ser escalada tipo contain (limitada pela largura)"
 
 html_sig = montar_html(vaga, combo, "data:x", logo, sigilosa=True)
-assert 'class="arte sigilosa"' in html_sig, "flag sigilosa não aplicou a classe"
+assert 'class="arte sigilosa ' in html_sig, "flag sigilosa não aplicou a classe"
 
 html_sem_logo = montar_html(vaga, combo, "data:x", None, sigilosa=False)
 assert "sigilosa" in html_sem_logo, "sem logo TFC deveria ocultar o slot"

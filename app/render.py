@@ -1,6 +1,6 @@
 """Render HTML → PNG com Playwright (Chromium headless, singleton).
 
-Viewport 1200×1500 (formato do Figma; atende o mínimo de 1080px do card).
+Viewport 1080×1350 (formato do frame Figma 2148:2, Instagram 4:5).
 RENDER_SCALE > 1 usa device_scale_factor para subir a resolução sem tocar no CSS.
 """
 import re
@@ -21,12 +21,13 @@ _browser: Browser | None = None
 _pw = None
 
 
-# Área máxima reservada pra logo no template (topo esquerdo), valor do Figma —
-# a moldura (padding + borda do CSS) soma por cima da imagem (box-sizing:
-# content-box), então descontamos esse espaço antes do "contain" pra imagem
-# + padding + borda fecharem exatamente em 303×165, não ultrapassar.
-_LOGO_MAX_W = 303
-_LOGO_MAX_H = 165
+# Área máxima reservada pra logo no template (topo esquerdo), valor do Figma
+# (frame 2148:2, "Rectangle 5" 308×175) — a moldura (padding + borda do CSS)
+# soma por cima da imagem (box-sizing: content-box), então descontamos esse
+# espaço antes do "contain" pra imagem + padding + borda fecharem exatamente
+# em 308×175, não ultrapassar.
+_LOGO_MAX_W = 308
+_LOGO_MAX_H = 175
 _LOGO_PADDING = 14
 _LOGO_BORDA = 1
 
@@ -81,7 +82,7 @@ async def _get_browser() -> Browser:
 async def render_png(html: str) -> bytes:
     browser = await _get_browser()
     page = await browser.new_page(
-        viewport={"width": 1200, "height": 1500},
+        viewport={"width": 1080, "height": 1350},
         device_scale_factor=config.RENDER_SCALE,
     )
     try:

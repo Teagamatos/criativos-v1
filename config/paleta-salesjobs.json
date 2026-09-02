@@ -2,7 +2,7 @@
   "_meta": {
     "fonte": "Figma — Projeto Automação (GHKmjoFwGCUuUDjhhvXVB9), extraído em 2026-08-20",
     "uso": "Conjunto válido para o sorteio aleatório de cor do template Salesjobs. Cada execução sorteia UMA combinação inteira (random.choice), nunca cores avulsas.",
-    "dimensoes_arte": "1200x1500 (formato do Figma; atende o mínimo de 1080px do card)",
+    "dimensoes_arte": "1080x1350 (frame Figma 2148:2, Instagram 4:5)",
     "fonte_tipografica": "Open Sans (Regular 400, SemiBold 600, Bold 700) — Google Fonts"
   },
   "combinacoes": [

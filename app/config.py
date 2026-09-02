@@ -29,7 +29,7 @@ LOGO_SALESJOBS_PATH = BASE_DIR / "templates" / "logo_Salesjobs.svg"  # asset fix
 LOGO_SALESJOBS_URL = "data:image/svg+xml;base64," + base64.b64encode(LOGO_SALESJOBS_PATH.read_bytes()).decode()
 LOGO_SALESJOBS_BRANCO_PATH = BASE_DIR / "templates" / "logo_Salesjobs_branco.svg"  # variante branca (fundo colorido)
 LOGO_SALESJOBS_BRANCO_URL = "data:image/svg+xml;base64," + base64.b64encode(LOGO_SALESJOBS_BRANCO_PATH.read_bytes()).decode()
-RENDER_SCALE = float(os.getenv("RENDER_SCALE", "1"))  # 1 → 1200×1500 (≥ mínimo 1080)
+RENDER_SCALE = float(os.getenv("RENDER_SCALE", "1"))  # 1 → 1080×1350 (Instagram 4:5)
 STATE_DB = Path(os.getenv("STATE_DB", BASE_DIR / "state.db"))
 
 PORT = int(os.getenv("PORT", "3001"))

@@ -1,14 +1,17 @@
 <!DOCTYPE html>
 <!--
-  Template Salesjobs — capturado do Figma "Projeto Automação" (frames SL, 1200×1500)
+  Template Salesjobs — capturado do Figma "Projeto Automação" (GHKmjoFwGCUuUDjhhvXVB9)
+  Frame de referência: node 2148:2 "SL - Fundo verde Letra branca (sigilosa)", 1080×1350.
+  Todas as coordenadas abaixo batem com esse frame; os outros combos de cor
+  reaproveitam essa mesma geometria trocando só as cores (paleta-salesjobs.json).
 
   Placeholders (padrão string-replace do repo mvp-arte):
     {{CARGO}}               título da vaga
-    {{LOCALIDADES_HTML}}    um <span class="pill">Cidade, UF</span> por localização
+    {{LOCALIDADES_HTML}}    um <span class="pill">Cidade | UF</span> por localização
     {{FOTO_URL}}            foto da pessoa (busca dinâmica na Pexels)
     {{LOGO_EMPRESA_URL}}    logo da contratante (vem no payload de /generate)
     {{LOGO_EMPRESA_W}} {{LOGO_EMPRESA_H}}  tamanho final da logo em px (calculado
-                            em render.py, tipo "contain" dentro de 303×189)
+                            em render.py, tipo "contain" dentro de 308×175)
     {{LOGO_SALESJOBS_URL}}  logo salesjobs do rodapé (asset fixo)
     {{MODO_SIGILOSA}}       "sigilosa" ou "" — oculta o logo da contratante
     {{COR_FUNDO}} {{COR_TEXTO}} {{COR_PILL_FUNDO}} {{COR_PILL_TEXTO}}
@@ -23,44 +26,47 @@
 <link href="https://fonts.googleapis.com/css2?family=Open+Sans:wght@400;600;700&display=swap" rel="stylesheet">
 <style>
   * { margin: 0; padding: 0; box-sizing: border-box; }
-  html, body { width: 1200px; height: 1500px; }
+  html, body { width: 1080px; height: 1350px; }
   body { font-family: 'Open Sans', sans-serif; }
 
   .arte {
     position: relative;
-    width: 1200px; height: 1500px;
+    width: 1080px; height: 1350px;
     overflow: hidden;
     background: {{COR_FUNDO}};
   }
 
   /* ── Foto: círculo gigante estourando o topo/direita ──
-     .foto-circulo e .elipse são CÍRCULOS CONCÊNTRICOS (mesmo centro:
-     left+width/2 e top+height/2 idênticos nos dois), só o raio (.elipse
-     menor) muda. Isso cria um anel de largura constante — a faixa de foto
-     visível entre os dois círculos não varia do topo até a base. Não mude
-     um dos dois sem recalcular o outro pra manter o mesmo centro. */
+     Figma 2148:18 "Ellipse 2". .foto-circulo (a foto) e .elipse (recorte de
+     acento por cima) são quase concêntricos: centro ≈ (1109, 391) nos dois,
+     só o raio muda — .elipse menor cria o anel "C" de largura ~constante.
+     Mexeu num, recalcule o outro pra manter o mesmo centro. */
   .foto-circulo {
-    position: absolute; left: 600px; top: -21px;
-    width: 1039.22px; height: 959.96px;
+    position: absolute; left: 661px; top: -57px;
+    width: 897px; height: 896px;
     border-radius: 50%;
     overflow: hidden;
+    /* sombra do círculo — dá profundidade no arco inferior/esquerdo
+       (o resto estoura fora do canvas e não aparece) */
+    box-shadow: 0 16px 40px rgba(0, 0, 0, 0.55);
   }
   .foto-circulo img { width: 100%; height: 100%; object-fit: cover; object-position: center top; }
 
-  /* ── Elipse de acento por cima da foto (cria o recorte em "C") ── */
+  /* ── Elipse de acento por cima da foto (cria o recorte em "C") ──
+     Figma 2160:6 "Ellipse 3". */
   .elipse {
-    position: absolute; left: 867px; top: 139.39px;
-    width: 696.31px; height: 629.26px;
+    position: absolute; left: 870px; top: 152px;
+    width: 505px; height: 478px;
     border-radius: 50%;
     background: {{COR_ELIPSE}};
   }
 
   /* ── Logo da empresa contratante — topo esquerdo; some na sigilosa ──
-     A moldura (fundo/borda/sombra) vai no <img>, com largura/altura exatas
-     calculadas em render.py (tipo "contain" dentro de 303×189, preservando
-     a proporção real da logo) — assim o cartão abraça o contorno da logo,
-     em vez de uma caixa fixa maior que sobra espaço vazio ao redor. */
-  .logo-empresa { position: absolute; left: 95px; top: 139px; }
+     Figma 2148:33 "Rectangle 5" (308×175). A moldura (padding/borda/sombra)
+     vai no <img>, com largura/altura exatas calculadas em render.py (tipo
+     "contain" dentro de 308×175, preservando a proporção real da logo) —
+     o cartão abraça o contorno da logo em vez de uma caixa fixa maior. */
+  .logo-empresa { position: absolute; left: 81px; top: 77px; }
   .logo-empresa img {
     display: block;
     padding: 14px;
@@ -70,49 +76,51 @@
   }
   .arte.sigilosa .logo-empresa { display: none; }
 
-  /* ── Card de apoio à direita (elemento fixo do design) ── */
+  /* ── Card de apoio à direita (elemento fixo do design) ──
+     Figma 2148:12 "Rectangle 2" — encosta na borda direita, abaixo da foto.
+     Sombra projeta pra esquerda/baixo (o lado direito estoura fora do canvas). */
   .card-direito {
-    position: absolute; left: 906px; top: 1013px;
-    width: 319px; height: 189px;
+    position: absolute; left: 811px; top: 871px;
+    width: 287px; height: 190px;
     background: {{COR_CARD_LOGO}};
-    box-shadow: 0 10px 24px rgba(0, 0, 0, 0.35);
+    box-shadow: -10px 14px 34px rgba(0, 0, 0, 0.28);
   }
 
   /* ── Bloco de texto ── */
-  .conteudo { position: absolute; left: 111px; top: 560px; width: 600px; }
+  .conteudo { position: absolute; left: 81px; top: 457px; width: 640px; }
 
   .vaga-label {
-    font-weight: 400; font-size: 71px; line-height: 1.35;
+    font-weight: 400; font-size: 56px; line-height: 1.0;
     color: {{COR_TEXTO}};
   }
   .cargo {
-    font-weight: 700; font-size: 89px;
-    letter-spacing: -0.09em; line-height: 0.994;
+    font-weight: 700; font-size: 77px;
+    letter-spacing: -0.09em; line-height: 0.98;
     color: {{COR_TEXTO}};
-    max-width: 560px;
-    padding-top: 14px;
+    max-width: 400px;
+    padding-top: 43px;
   }
   .localidades {
-    margin-top: 40px;
-    display: flex; flex-direction: column; align-items: flex-start; gap: 18px;
+    margin-top: 66px;
+    display: flex; flex-direction: column; align-items: flex-start; gap: 16px;
     max-width: 560px;
   }
   .pill {
     display: inline-flex; align-items: center;
     background: {{COR_PILL_FUNDO}};
     color: {{COR_PILL_TEXTO}};
-    font-weight: 600; font-size: 39px; line-height: 1;
-    padding: 9px 28px;
+    font-weight: 700; font-size: 30px; line-height: 1;
+    padding: 14px 26px;
     border-radius: 999px;
     white-space: nowrap;
   }
 
-  /* ── Rodapé: logo salesjobs centralizado ── */
+  /* ── Rodapé: logo salesjobs centralizado ── Figma 2148:10 ── */
   .rodape {
-    position: absolute; left: 0; bottom: 70px; width: 1200px;
+    position: absolute; left: 0; bottom: 45px; width: 1080px;
     display: flex; justify-content: center;
   }
-  .rodape img { height: 48px; }
+  .rodape img { height: 46px; }
 </style>
 </head>
 <body>
@@ -136,12 +144,12 @@
   <script>
     // Auto-ajuste (padrão do repo): roda após as fontes carregarem.
     // 1) Cargo: encolhe a fonte até caber em no máx. 3 linhas dentro da coluna.
-    // 2) Localidades: encolhe as pills até o bloco não invadir a área da foto/card.
+    // 2) Localidades: encolhe as pills até o bloco não invadir a área do rodapé.
     document.fonts.ready.then(() => {
       const cargo = document.querySelector('.cargo');
-      let fs = 89;
-      const maxAltura = 3 * 89; // ~3 linhas no tamanho original
-      while (cargo.scrollHeight > maxAltura && fs > 44) {
+      let fs = 77;
+      const maxAltura = 3 * 77 * 0.98; // ~3 linhas no tamanho original
+      while (cargo.scrollHeight > maxAltura && fs > 40) {
         fs -= 2;
         cargo.style.fontSize = fs + 'px';
       }
@@ -149,10 +157,10 @@
       const locs = document.querySelector('.localidades');
       const pills = [...locs.querySelectorAll('.pill')];
       if (pills.length) {
-        let pfs = 39;
+        let pfs = 30;
         const limiteInferior = 1180; // não pode encostar na área do rodapé
         const passa = () => locs.getBoundingClientRect().bottom <= limiteInferior;
-        while (!passa() && pfs > 22) {
+        while (!passa() && pfs > 20) {
           pfs -= 1.5;
           pills.forEach(p => p.style.fontSize = pfs + 'px');
         }

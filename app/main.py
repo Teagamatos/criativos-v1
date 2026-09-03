@@ -15,14 +15,27 @@ import hmac
 import logging
 from contextlib import asynccontextmanager
 
-from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException
+from fastapi import BackgroundTasks, Body, Depends, FastAPI, HTTPException, Request
+from fastapi.responses import JSONResponse
 from fastapi.security import HTTPAuthorizationCredentials, HTTPBearer
 from pydantic import BaseModel, Field
 
-from . import config, render
+from . import config, notify, render
 from .pipeline import processar
 
-logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(message)s")
+
+def _configurar_logs() -> None:
+    """stdout formatado — no Railway isso vira o feed de logs do serviço."""
+    logging.basicConfig(
+        level=logging.INFO,
+        format="%(asctime)s %(levelname)-7s %(name)s %(message)s",
+        datefmt="%Y-%m-%d %H:%M:%S",
+    )
+    for ruidoso in ("httpx", "httpcore"):
+        logging.getLogger(ruidoso).setLevel(logging.WARNING)
+
+
+_configurar_logs()
 log = logging.getLogger("server")
 
 
@@ -44,7 +57,7 @@ Quem chama (n8n) já resolveu todos os dados da vaga. A API só orquestra:
 4. anexo no card do ClickUp com "Gerado automaticamente" + timestamp.
 
 Falhas técnicas têm retry 3x com backoff; persistindo, a API comenta o erro no
-card e notifica o canal do inbound (`NOTIFY_WEBHOOK_URL`).
+card e notifica o Discord (`DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`).
 
 O processamento roda em *background*: `POST /generate` responde `202 accepted`
 na hora e a arte aparece no card alguns segundos depois.
@@ -60,6 +73,21 @@ app = FastAPI(
         {"name": "infra", "description": "Health check e monitoramento."},
     ],
 )
+
+@app.exception_handler(Exception)
+async def _erro_nao_tratado(request: Request, exc: Exception) -> JSONResponse:
+    """Qualquer exceção não tratada num handler: loga com traceback e avisa o
+    Discord. (HTTPException e erros de validação seguem o fluxo normal do
+    FastAPI — não caem aqui.)"""
+    log.exception("erro não tratado em %s %s", request.method, request.url.path)
+    await notify.erro_discord(
+        f"❌ Erro não tratado — {request.method} {request.url.path}",
+        contexto={"método": request.method, "rota": request.url.path,
+                  "erro": f"{type(exc).__name__}: {exc}"},
+        exc=exc,
+    )
+    return JSONResponse(status_code=500, content={"error": "erro interno"})
+
 
 # Habilita o botão "Authorize" no Swagger UI. auto_error=False: quando
 # GENERATE_TOKEN não está definido o endpoint fica aberto (com warning no log).

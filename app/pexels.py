@@ -5,13 +5,22 @@ gerada a partir do cargo + contexto da vaga. Os resultados já são URLs
 públicas do CDN da Pexels — sem credencial necessária no Chromium do render,
 diferente do Drive (que exigia baixar o binário e embutir como data URI).
 """
+import logging
+
 import httpx
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
 
 from . import config
 
+log = logging.getLogger("pexels")
+
 _URL = "https://api.pexels.com/v1/search"
-_RETRY = dict(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8), reraise=True)
+_RETRY = dict(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=1, max=8),
+    before_sleep=before_sleep_log(log, logging.WARNING),
+    reraise=True,
+)
 
 
 @retry(**_RETRY)

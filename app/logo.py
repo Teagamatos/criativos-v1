@@ -13,11 +13,16 @@ import logging
 import cv2
 import httpx
 import numpy as np
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
 
 log = logging.getLogger("logo")
 
-_RETRY = dict(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8), reraise=False)
+_RETRY = dict(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=1, max=8),
+    before_sleep=before_sleep_log(log, logging.WARNING),
+    reraise=False,
+)
 
 
 @retry(**_RETRY)

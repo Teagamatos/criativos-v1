@@ -3,14 +3,17 @@
 Viewport 1080×1350 (formato do frame Figma 2148:2, Instagram 4:5).
 RENDER_SCALE > 1 usa device_scale_factor para subir a resolução sem tocar no CSS.
 """
+import logging
 import re
 
 from jinja2 import Environment, FileSystemLoader, select_autoescape
 from markupsafe import Markup
 from playwright.async_api import Browser, async_playwright
-from tenacity import retry, stop_after_attempt, wait_exponential
+from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponential
 
 from . import config
+
+log = logging.getLogger("render")
 
 _env = Environment(
     loader=FileSystemLoader(config.TEMPLATE_PATH.parent),
@@ -78,7 +81,12 @@ async def _get_browser() -> Browser:
     return _browser
 
 
-@retry(stop=stop_after_attempt(3), wait=wait_exponential(min=1, max=8), reraise=True)
+@retry(
+    stop=stop_after_attempt(3),
+    wait=wait_exponential(min=1, max=8),
+    before_sleep=before_sleep_log(log, logging.WARNING),
+    reraise=True,
+)
 async def render_png(html: str) -> bytes:
     browser = await _get_browser()
     page = await browser.new_page(

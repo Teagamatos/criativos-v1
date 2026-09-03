@@ -9,8 +9,9 @@ Figma) e foto (busca dinâmica na Pexels, com query gerada por GPT a partir do
 cargo/contexto da vaga, excluindo as últimas N usadas), conversão da logo pra
 PNG, render HTML→PNG 1200×1500 e anexo no card do ClickUp com "Gerado
 automaticamente" + timestamp. Falhas técnicas: retry 3x com backoff;
-persistindo, comenta no card e notifica o canal do inbound. Cada chamada gera
-uma arte nova — sem dedup.
+persistindo, comenta no card, loga o traceback e notifica o Discord
+(bot API — `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`). Cada chamada gera uma
+arte nova — sem dedup.
 
 ## Rodando
 
@@ -61,7 +62,7 @@ flowchart TD
     PNG --> AT["clickup.attach_file(task, png)"]
     AT --> CM["clickup.post_comment(task)\n'Gerado automaticamente' + timestamp"]
 
-    PNG -.->|"falha técnica após retries"| ERR["comenta erro no card\n+ NOTIFY_WEBHOOK_URL"]
+    P -.->|"exceção em qualquer etapa"| ERR["log.exception (traceback no stdout)\n+ comenta no card\n+ notify.erro_discord (bot API — content + embed com traceback)"]
 ```
 
 Não há mais busca em sistema externo de vaga (Foursales) nem webhook nativo do
@@ -70,8 +71,12 @@ resultado.
 
 ## Estrutura
 
-    app/main.py      FastAPI: /generate (Bearer, payload completo da vaga), /health
-    app/pipeline.py  orquestração — mapa dos critérios de aceite comentado no topo
+    app/main.py      FastAPI: /generate (Bearer, payload completo da vaga), /health,
+                     Swagger em /docs, config de log e handler global de exceção
+    app/pipeline.py  orquestração — mapa dos critérios de aceite comentado no topo;
+                     rastreia a `etapa` atual pra logar/notificar onde quebrou
+    app/notify.py    erro_discord() — POST no canal do Discord (bot API v10):
+                     content de alerta + embed vermelho com contexto e traceback
     app/clickup.py   API v2: só comentário e anexo (dados da vaga já vêm no payload)
     app/logo.py      baixa a URL da logo (sem extensão) e reencoda como PNG via
                      OpenCV — não depende do Content-Type/extensão da URL
@@ -91,8 +96,10 @@ resultado.
 
 ## Pendências para fechar com o time
 
-1. **Canal de notificação** — `NOTIFY_WEBHOOK_URL` deve apontar para o mesmo
-   canal do fluxo de inbound; confirmar URL e payload esperado.
+1. **Canal de notificação** — bot do Discord no servidor do time com permissão
+   de enviar mensagem no canal de alertas; `DISCORD_BOT_TOKEN` +
+   `DISCORD_CHANNEL_ID` no env (falhas do pipeline e erros não tratados da API
+   caem lá, com `content` de alerta + traceback no embed).
 2. **Formato 1200×1500 (4:5)** — atende o mínimo de 1080px do card, mas não é
    quadrado; confirmar se 1080×1080 exato é requisito.
 

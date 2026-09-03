@@ -19,8 +19,13 @@ PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 FOTOS_EXCLUIR_ULTIMAS_N = int(os.getenv("FOTOS_EXCLUIR_ULTIMAS_N", "5"))
 
-# ── Notificação de falha (mesmo canal do inbound) ────────────
-NOTIFY_WEBHOOK_URL = os.getenv("NOTIFY_WEBHOOK_URL", "")
+# ── Notificação de falha — Discord (bot API v10) ─────────────
+# POST https://discord.com/api/v10/channels/{DISCORD_CHANNEL_ID}/messages
+# com Authorization: Bot {DISCORD_BOT_TOKEN}
+DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
+DISCORD_CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID", "")
+# menção opcional colada no início da mensagem (ex.: "@everyone", "<@&ID_DO_CARGO>")
+DISCORD_MENTION = os.getenv("DISCORD_MENTION", "")
 
 # ── Render ───────────────────────────────────────────────────
 TEMPLATE_PATH = BASE_DIR / "templates" / "template-salesjobs.html"

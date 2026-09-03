@@ -50,9 +50,9 @@ async def erro_discord(
         log.warning("Discord não configurado (DISCORD_BOT_TOKEN/DISCORD_CHANNEL_ID) — falha não notificada: %s", titulo)
         return
 
-    content = f"🚨 **(URGENTE)** — {titulo}"
+    content = f"🚨 **(URGENTE)**\nErro no workflow: **{config.DISCORD_PROJETO}**\n{titulo}"
     if config.DISCORD_MENTION:
-        content = f"{config.DISCORD_MENTION} {content}"
+        content = f"{config.DISCORD_MENTION}\n{content}"
 
     embed: dict = {
         "title": titulo[:256],

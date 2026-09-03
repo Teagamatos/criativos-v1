@@ -26,6 +26,8 @@ DISCORD_BOT_TOKEN = os.getenv("DISCORD_BOT_TOKEN", "")
 DISCORD_CHANNEL_ID = os.getenv("DISCORD_CHANNEL_ID", "")
 # menção opcional colada no início da mensagem (ex.: "@everyone", "<@&ID_DO_CARGO>")
 DISCORD_MENTION = os.getenv("DISCORD_MENTION", "")
+# nome do "workflow" que aparece no alerta de erro (estilo n8n Error Trigger)
+DISCORD_PROJETO = os.getenv("DISCORD_PROJETO", "LAB-706 | Criativos")
 
 # ── Render ───────────────────────────────────────────────────
 TEMPLATE_PATH = BASE_DIR / "templates" / "template-salesjobs.html"

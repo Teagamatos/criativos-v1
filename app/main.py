@@ -56,11 +56,15 @@ Quem chama (n8n) já resolveu todos os dados da vaga. A API só orquestra:
 3. render HTML→PNG com Playwright/Chromium;
 4. anexo no card do ClickUp com "Gerado automaticamente" + timestamp.
 
+Cada chamada gera **`CRIATIVOS_POR_VAGA` artes** (env, default 3): o endpoint
+dispara N execuções independentes desse pipeline, cada uma sorteando cor e foto
+próprias e anexando uma arte no mesmo card.
+
 Falhas técnicas têm retry 3x com backoff; persistindo, a API comenta o erro no
 card e notifica o Discord (`DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`).
 
 O processamento roda em *background*: `POST /generate` responde `202 accepted`
-na hora e a arte aparece no card alguns segundos depois.
+na hora e as artes aparecem no card alguns segundos depois.
 """.strip()
 
 app = FastAPI(
@@ -154,7 +158,13 @@ class HealthResponse(BaseModel):
     "/generate",
     status_code=202,
     tags=["geração"],
-    summary="Dispara a geração de uma arte de vaga",
+    summary="Dispara a geração das artes de uma vaga",
+    description=(
+        "Aceita e enfileira o trabalho em *background* (responde na hora). "
+        "Gera `CRIATIVOS_POR_VAGA` artes (default 3) no card do ClickUp indicado "
+        "por `task` — cada uma com cor e foto próprias. Um objeto de vaga, ou uma "
+        "lista com um objeto (formato do n8n)."
+    ),
     response_model=AceitoResponse,
     responses={
         401: {"description": "Token ausente ou inválido (quando `GENERATE_TOKEN` está definido)."},

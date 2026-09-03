@@ -7,11 +7,12 @@ nível, localizações, se é sigilosa, o `task` (ID do card no ClickUp) e a URL
 da logo da contratante — e cuida do resto: sorteio de cor (paleta oficial do
 Figma) e foto (busca dinâmica na Pexels, com query gerada por GPT a partir do
 cargo/contexto da vaga, excluindo as últimas N usadas), conversão da logo pra
-PNG, render HTML→PNG 1200×1500 e anexo no card do ClickUp com "Gerado
-automaticamente" + timestamp. Falhas técnicas: retry 3x com backoff;
-persistindo, comenta no card, loga o traceback e notifica o Discord
-(bot API — `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`). Cada chamada gera uma
-arte nova — sem dedup.
+PNG, render HTML→PNG 1080×1350 e anexo no card do ClickUp com "Gerado
+automaticamente" + timestamp. Cada chamada dispara `CRIATIVOS_POR_VAGA`
+pipelines independentes (default 3) — cada um sorteia cor/foto próprias e
+anexa uma arte no card. Falhas técnicas: retry 3x com backoff; persistindo,
+comenta no card, loga o traceback e notifica o Discord (bot API —
+`DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`). Sem dedup entre chamadas.
 
 ## Rodando
 
@@ -40,7 +41,7 @@ pro preview direto no GitHub/IDE:
 ```mermaid
 flowchart TD
     A["n8n / disparo externo\n(já resolveu os dados da vaga)"] -->|"POST /generate\n{cargo, segmento, empresa, nível,\nlocalizacoes, sigilosa, task, logo}\n+ Bearer"| V["main.py valida campos\nobrigatórios (cargo, localizacoes, task)"]
-    V -->|"background task"| P["pipeline.processar(dados)"]
+    V -->|"N background tasks\n(N = CRIATIVOS_POR_VAGA, default 3)"| P["pipeline.processar(dados)\n× N, em sequência"]
 
     P --> SIG{"sigilosa?"}
     SIG -->|"não"| LOGO["logo.baixar_png(url)\nOpenCV decodifica bytes reais\n→ reencoda como PNG"]
@@ -57,7 +58,7 @@ flowchart TD
     SEMLOGO --> R
     SORT --> R
     ROSTO2 --> R
-    R --> PNG["render.render_png()\nPlaywright/Chromium 1200×1500"]
+    R --> PNG["render.render_png()\nPlaywright/Chromium 1080×1350"]
 
     PNG --> AT["clickup.attach_file(task, png)"]
     AT --> CM["clickup.post_comment(task)\n'Gerado automaticamente' + timestamp"]
@@ -71,8 +72,9 @@ resultado.
 
 ## Estrutura
 
-    app/main.py      FastAPI: /generate (Bearer, payload completo da vaga), /health,
-                     Swagger em /docs, config de log e handler global de exceção
+    app/main.py      FastAPI: /generate (Bearer, payload completo da vaga; dispara
+                     CRIATIVOS_POR_VAGA pipelines), /health, Swagger em /docs,
+                     config de log e handler global de exceção
     app/pipeline.py  orquestração — mapa dos critérios de aceite comentado no topo;
                      rastreia a `etapa` atual pra logar/notificar onde quebrou
     app/notify.py    erro_discord() — POST no canal do Discord (bot API v10):
@@ -91,7 +93,7 @@ resultado.
                      já reordenado por rosto.py (exclui últimas N usadas)
     app/state.py     SQLite: fotos usadas entre execuções (STATE_DB → volume!)
     app/render.py    Jinja2 + Playwright (Chromium singleton, retry 3x)
-    templates/       template capturado do Figma (1200×1500, Open Sans)
+    templates/       template capturado do Figma (1080×1350, Open Sans)
     config/          paleta-salesjobs.json — 4 combinações extraídas do Figma
 
 ## Pendências para fechar com o time
@@ -100,7 +102,7 @@ resultado.
    de enviar mensagem no canal de alertas; `DISCORD_BOT_TOKEN` +
    `DISCORD_CHANNEL_ID` no env (falhas do pipeline e erros não tratados da API
    caem lá, com `content` de alerta + traceback no embed).
-2. **Formato 1200×1500 (4:5)** — atende o mínimo de 1080px do card, mas não é
+2. **Formato 1080×1350 (4:5)** — atende o mínimo de 1080px do card, mas não é
    quadrado; confirmar se 1080×1080 exato é requisito.
 
 ## Resolvidas

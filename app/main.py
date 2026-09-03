@@ -173,7 +173,11 @@ async def generate(
         if not payload:
             raise HTTPException(status_code=422, detail="lista de vagas vazia")
         payload = payload[0]
-    background.add_task(processar, payload.model_dump())
+    dados = payload.model_dump()
+    # N artes por vaga: cada uma é um pipeline independente (sorteia cor/foto
+    # próprias). As background tasks rodam em sequência após a resposta.
+    for _ in range(config.CRIATIVOS_POR_VAGA):
+        background.add_task(processar, dados)
     return AceitoResponse(status="accepted")
 
 

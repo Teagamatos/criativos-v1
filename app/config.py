@@ -18,6 +18,8 @@ GENERATE_TOKEN = os.getenv("GENERATE_TOKEN", "")
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
 FOTOS_EXCLUIR_ULTIMAS_N = int(os.getenv("FOTOS_EXCLUIR_ULTIMAS_N", "5"))
+# quantas artes gerar por vaga (cada uma = 1 pipeline independente)
+CRIATIVOS_POR_VAGA = max(1, int(os.getenv("CRIATIVOS_POR_VAGA", "3")))
 
 # ── Notificação de falha — Discord (bot API v10) ─────────────
 # POST https://discord.com/api/v10/channels/{DISCORD_CHANNEL_ID}/messages

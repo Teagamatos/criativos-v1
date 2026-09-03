@@ -1,0 +1,24 @@
+# venv (binários Windows, não servem no container) e artefatos de build
+.venv/
+__pycache__/
+*.pyc
+
+# git / IDE
+.git/
+.gitignore
+.idea/
+
+# SEGREDOS — nunca dentro da imagem (no Railway as vars vão no dashboard)
+.env
+.env.*
+
+# estado local e saídas de teste
+state.db
+_teste_*/
+tests/payloads/*.json
+
+# docs / infra que não é usada em runtime
+docs/
+*.md
+Dockerfile
+.dockerignore

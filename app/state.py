@@ -12,6 +12,7 @@ from . import config
 
 @contextmanager
 def _conn():
+    config.STATE_DB.parent.mkdir(parents=True, exist_ok=True)  # ex.: Volume /data no Railway
     con = sqlite3.connect(config.STATE_DB)
     try:
         con.execute(

@@ -5,5 +5,11 @@ __pycache__/
 *.pyc
 .venv/
 .idea/
+
+# artes renderizadas / capturas de teste na raiz e em _teste_*/
 *.png
+_teste_*/
+# ...mas os assets do template (logos, fundos etc.) sobem sempre
+!templates/**
+
 tests/payloads/*.json

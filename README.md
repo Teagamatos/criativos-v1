@@ -21,6 +21,11 @@ uma arte nova — sem dedup.
 
     python -m tests.test_smoke   # partes puras, sem rede
 
+Docs interativas dos endpoints com o servidor no ar: Swagger UI em
+`http://localhost:3001/docs`, ReDoc em `/redoc`, schema OpenAPI em
+`/openapi.json`. Use o botão **Authorize** do Swagger pra mandar o
+`GENERATE_TOKEN` (Bearer) nas chamadas de teste.
+
 Docker: a imagem base `mcr.microsoft.com/playwright/python` já traz o Chromium;
 o Dockerfile instala a fonte Open Sans (obrigatória — é a fonte do template).
 

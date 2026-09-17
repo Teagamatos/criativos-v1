@@ -27,12 +27,14 @@ import asyncio
 import logging
 from datetime import datetime, timezone
 
-from . import clickup, config, logo, notify, openai_client, pexels, render, rosto, sorteio
+from . import clickup, config, logo, notify, openai_client, pexels, render, rosto, sorteio, unsplash
+
+_PROVIDERS = {"pexels": pexels, "unsplash": unsplash}
 
 log = logging.getLogger("pipeline")
 
 
-async def processar(dados: dict) -> None:
+async def processar(dados: dict, foto_provider: str | None = None) -> None:
     task_id = str(dados.get("task") or "?")
     etapa = "validação"
     log.info("[%s] iniciando — cargo=%r sigilosa=%s", task_id, dados.get("cargo"), bool(dados.get("sigilosa")))
@@ -58,13 +60,16 @@ async def processar(dados: dict) -> None:
         combinacao = sorteio.sortear_combinacao()
         log.info("[%s] combinação sorteada: %s", task_id, combinacao["id"])
 
+        provider = _PROVIDERS.get(foto_provider or config.FOTO_PROVIDER, pexels)
+        provider_nome = provider.__name__.split(".")[-1]
+
         etapa = "query da foto (OpenAI)"
         contexto = {"segmento": vaga["segmento"], "empresa": vaga["empresa"], "nivel": vaga["nivel"]}
         query = await openai_client.gerar_query_foto(vaga["titulo"], contexto) or f"{vaga['titulo']} portrait"
-        log.info("[%s] query Pexels: %r", task_id, query)
+        log.info("[%s] query (%s): %r", task_id, provider_nome, query)
 
-        etapa = "busca de foto (Pexels)"
-        pool = await asyncio.to_thread(pexels.buscar_fotos, query)
+        etapa = f"busca de foto ({provider_nome})"
+        pool = await asyncio.to_thread(provider.buscar_fotos, query)
         pool = await asyncio.to_thread(rosto.ordenar_por_rosto, pool)
         foto = sorteio.escolher_foto(pool)
         foto_uri = await asyncio.to_thread(rosto.enquadrar, foto, combinacao["elipse"])

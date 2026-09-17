@@ -17,6 +17,12 @@ GENERATE_TOKEN = os.getenv("GENERATE_TOKEN", "")
 # ── Pexels (busca de fotos) + OpenAI (query de busca e condensação) ──
 PEXELS_API_KEY = os.getenv("PEXELS_API_KEY", "")
 OPENAI_API_KEY = os.getenv("OPENAI_API_KEY", "")
+# Unsplash — segundo provider de foto (ver app/unsplash.py). Em produção,
+# main.py:/generate já divide CRIATIVOS_POR_VAGA entre pexels/unsplash
+# explicitamente; FOTO_PROVIDER só vale como default de pipeline.processar()
+# quando chamado sem o parâmetro (ex.: scripts de teste manuais).
+UNSPLASH_ACCESS_KEY = os.getenv("UNSPLASH_ACCESS_KEY", "")
+FOTO_PROVIDER = os.getenv("FOTO_PROVIDER", "pexels").strip().lower()
 FOTOS_EXCLUIR_ULTIMAS_N = int(os.getenv("FOTOS_EXCLUIR_ULTIMAS_N", "5"))
 # quantas artes gerar por vaga (cada uma = 1 pipeline independente)
 CRIATIVOS_POR_VAGA = max(1, int(os.getenv("CRIATIVOS_POR_VAGA", "3")))

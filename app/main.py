@@ -50,15 +50,17 @@ Geração automática de artes de vaga da **Salesjobs** (HTML → PNG 1080×1350
 
 Quem chama (n8n) já resolveu todos os dados da vaga. A API só orquestra:
 
-1. sorteio de cor (paleta oficial do Figma) e de foto (busca dinâmica na Pexels,
-   query gerada por GPT a partir do cargo/contexto, excluindo as últimas N usadas);
+1. sorteio de cor (paleta oficial do Figma) e de foto (busca dinâmica no Pexels
+   ou Unsplash, query gerada por GPT a partir do cargo/contexto, excluindo as
+   últimas N usadas);
 2. logo da contratante convertida pra PNG (`sigilosa=true` omite a logo);
 3. render HTML→PNG com Playwright/Chromium;
 4. anexo no card do ClickUp com "Gerado automaticamente" + timestamp.
 
 Cada chamada gera **`CRIATIVOS_POR_VAGA` artes** (env, default 3): o endpoint
 dispara N execuções independentes desse pipeline, cada uma sorteando cor e foto
-próprias e anexando uma arte no mesmo card.
+próprias e anexando uma arte no mesmo card. Metade das artes usa foto do
+Pexels e metade do Unsplash (o extra, quando N é ímpar, fica com o Pexels).
 
 Falhas técnicas têm retry 3x com backoff; persistindo, a API comenta o erro no
 card e notifica o Discord (`DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`).
@@ -162,8 +164,9 @@ class HealthResponse(BaseModel):
     description=(
         "Aceita e enfileira o trabalho em *background* (responde na hora). "
         "Gera `CRIATIVOS_POR_VAGA` artes (default 3) no card do ClickUp indicado "
-        "por `task` — cada uma com cor e foto próprias. Um objeto de vaga, ou uma "
-        "lista com um objeto (formato do n8n)."
+        "por `task` — cada uma com cor e foto próprias, metade via Pexels e "
+        "metade via Unsplash. Um objeto de vaga, ou uma lista com um objeto "
+        "(formato do n8n)."
     ),
     response_model=AceitoResponse,
     responses={
@@ -185,9 +188,14 @@ async def generate(
         payload = payload[0]
     dados = payload.model_dump()
     # N artes por vaga: cada uma é um pipeline independente (sorteia cor/foto
-    # próprias). As background tasks rodam em sequência após a resposta.
-    for _ in range(config.CRIATIVOS_POR_VAGA):
-        background.add_task(processar, dados)
+    # próprias). Metade com foto do Pexels, metade do Unsplash — o extra (N
+    # ímpar) fica com o Pexels. As background tasks rodam em sequência após a
+    # resposta.
+    n = config.CRIATIVOS_POR_VAGA
+    n_pexels = -(-n // 2)  # ceil(n / 2)
+    providers = ["pexels"] * n_pexels + ["unsplash"] * (n - n_pexels)
+    for provider in providers:
+        background.add_task(processar, dados, provider)
     return AceitoResponse(status="accepted")
 
 

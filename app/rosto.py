@@ -1,34 +1,32 @@
-"""Escolhe e reenquadra a foto do Pexels pra deixar o rosto sempre visível.
+"""Escolhe e reenquadra a foto do banco de imagens pra deixar o rosto sempre visível.
 
 A busca por palavra-chave não garante que o topo do resultado seja de fato
 um retrato de rosto fechado — baixamos as miniaturas dos candidatos e rodamos
-detecção de rosto local (OpenCV, sem custo de API) pra escolher entre eles
-(`ordenar_por_rosto`) e depois recompor a foto vencedora (`enquadrar`) pra
-garantir que o rosto caia numa posição boa do recorte, não só torcer pra
-calhar.
+detecção de rosto local (OpenCV, sem custo de API). Isso faz DUAS coisas:
+tira da disputa o que não tem rosto detectável (`ordenar_por_rosto` põe quem tem
+rosto na frente; `sorteio.escolher_foto` só aceita esses) e localiza o rosto pra
+recompor a foto vencedora (`enquadrar`). O Haar cascade não entende semântica
+(painel de máquina, operário fumando…) — quem julga o conteúdo é a curadoria
+por visão em `openai_client.curar_fotos`, que recebe as miniaturas baixadas aqui.
 
 Geometria real do template (template-salesjobs.html): a foto entra num
-container CIRCULAR de 1033×1033 (.foto-circulo) com object-fit:cover +
-object-position:"center top". Fotos de banco em retrato (mais estreitas que
-o container) preenchem 100% da LARGURA — ou seja, a fração horizontal do
-rosto na foto original é preservada 1:1 (o container é quadrado, então as
-frações x e y mapeiam direto, sem distorcer) — e é por isso que
-object-position no eixo X NÃO tem efeito nenhum aqui: o cover já usa toda a
-largura, não sobra folga horizontal pra "empurrar" a imagem (testado
-empiricamente: "left top" e "center top" dão o mesmo resultado pixel a
-pixel). Por cima da foto tem uma ELIPSE de acento (.elipse) CONCÊNTRICA —
-mesmo centro do .foto-circulo, raio menor (255.5 de 516.5, ou seja, ~24.7%
-da largura do container) — criando um anel de largura constante em vez de
-uma faixa só de um lado.
+container CIRCULAR (.foto-circulo, 897×896 em left:661 top:-57) com
+object-fit:cover. Por cima tem uma ELIPSE de acento (.elipse) CONCÊNTRICA — mesmo
+centro, raio menor (~252×239 contra 448) — criando um anel de largura constante.
+Só ~419px do container ficam dentro do canvas de 1080 (o resto estoura pela
+direita) e os ~57px de cima ficam fora pelo topo.
 
-Como o CSS não consegue reposicionar horizontalmente, `enquadrar` faz isso
-no servidor: recorta/reamostra a foto (Python/OpenCV) já centrada no ponto
-certo do anel, preenchendo com a cor da elipse (`combinacao["elipse"]`)
-onde não sobrar foto de verdade — essa sobra de preenchimento cai quase
-toda debaixo da própria elipse, então normalmente nem aparece.
+Como o CSS não consegue reposicionar a foto com precisão, `enquadrar` faz isso
+no servidor: recorta/reamostra a foto (Python/OpenCV) de modo que o rosto caia
+no anel visível COM TAMANHO CONTROLADO (rosto grande demais estoura o círculo e
+some debaixo da elipse; pequeno demais perde presença), aumentando o zoom o
+quanto precisar pra foto cobrir toda a área visível (sem sobrar vazio).
 """
 import base64
 import logging
+import threading
+from concurrent.futures import ThreadPoolExecutor
+from typing import NamedTuple
 
 import cv2
 import httpx
@@ -38,32 +36,47 @@ from tenacity import before_sleep_log, retry, stop_after_attempt, wait_exponenti
 log = logging.getLogger("rosto")
 
 _CASCADE = cv2.CascadeClassifier(cv2.data.haarcascades + "haarcascade_frontalface_default.xml")
+# CascadeClassifier NÃO é thread-safe (buffers internos): sem o lock, detecções
+# concorrentes devolvem rostos fantasma. O download das miniaturas segue paralelo.
+_CASCADE_LOCK = threading.Lock()
 _RETRY = dict(
     stop=stop_after_attempt(2),
     wait=wait_exponential(min=1, max=4),
     before_sleep=before_sleep_log(log, logging.WARNING),
-    reraise=False,
+    reraise=True,
 )
 
 
 @retry(**_RETRY)
-def _baixar(url: str, cor: int) -> np.ndarray:
+def _baixar_bytes(url: str) -> bytes:
     r = httpx.get(url, timeout=12)
     r.raise_for_status()
-    arr = np.frombuffer(r.content, dtype=np.uint8)
-    return cv2.imdecode(arr, cor)
+    return r.content
 
 
-# Zona segura na foto ORIGINAL (frações 0-1 do container 1033×1033),
-# derivada da geometria concêntrica do template — ver docstring acima.
-_RAIO_ELIPSE = 0.247  # 255.5px / 1033px — dentro disso do centro, a elipse cobre
-_Y_MIN_SEGURO = 0.14  # acima disso (~139px/1033px), fica fora do canvas por cima
-_X_MAX_SEGURO = 0.57  # além disso (~594px/1033px), sai do canvas pela direita
+def _decodificar(dados: bytes, cor: int) -> np.ndarray | None:
+    return cv2.imdecode(np.frombuffer(dados, dtype=np.uint8), cor)
 
 
-def _detectar(img: np.ndarray | None) -> tuple[float, float, float] | None:
-    """Retorna (cx_relativo, cy_relativo, area_relativa) do maior rosto
-    detectado, ou None se não achou nenhum.
+class Rosto(NamedTuple):
+    """Maior rosto detectado — tudo em fração (0-1) da foto original."""
+
+    cx: float
+    cy: float
+    area: float
+    largura: float
+    largura_final: float = 0.0  # largura do rosto no container (px de 1033) depois do enquadramento
+
+
+_AREA_MIN = 0.012  # abaixo disso o "rosto" é quase certamente falso positivo (estampa, textura)
+_MAX_CANDIDATAS_CURADORIA = 16  # quantas miniaturas (com rosto) seguem pra curadoria por visão
+# Rosto que, pra foto cobrir a área visível, acabaria com mais que isso (px de 1033)
+# é close-up demais: estoura o anel e some debaixo da elipse. Foto descartada.
+_LARGURA_FINAL_MAX = 250
+
+
+def _detectar(img: np.ndarray | None) -> Rosto | None:
+    """Maior rosto detectado, ou None se não achou nenhum.
 
     Quando há mais de um candidato (ex.: estampa numa roupa parecendo rosto),
     escolhe pelo PESO de confiança do Haar cascade (`outputRejectLevels`), não
@@ -74,106 +87,123 @@ def _detectar(img: np.ndarray | None) -> tuple[float, float, float] | None:
         return None
     altura, largura = img.shape
     lado_min = int(min(altura, largura) * 0.12)
-    faces, _niveis, pesos = _CASCADE.detectMultiScale3(
-        img, scaleFactor=1.1, minNeighbors=5, minSize=(lado_min, lado_min), outputRejectLevels=True
-    )
+    with _CASCADE_LOCK:
+        faces, _niveis, pesos = _CASCADE.detectMultiScale3(
+            img, scaleFactor=1.1, minNeighbors=5, minSize=(lado_min, lado_min), outputRejectLevels=True
+        )
     if len(faces) == 0:
         return None
     x, y, w, h = faces[int(np.argmax(pesos))]
-    area_relativa = (w * h) / (largura * altura)
-    cx_relativo = (x + w / 2) / largura
-    cy_relativo = (y + h / 2) / altura
-    return cx_relativo, cy_relativo, area_relativa
+    rosto = Rosto(
+        cx=(x + w / 2) / largura,
+        cy=(y + h / 2) / altura,
+        area=(w * h) / (largura * altura),
+        largura=w / largura,
+    )
+    # escala sem teto: a miniatura é pequena, o teto de upscale só vale na foto real
+    _, largura_final = _plano(rosto, largura, altura, limitar_upscale=False)
+    return rosto._replace(largura_final=largura_final)
 
 
-def _pontuar(pos: tuple[float, float, float] | None) -> float:
-    """0 = sem rosto detectado. Maior = rosto grande, fora do círculo da
-    elipse e dentro da área visível no canvas."""
-    if pos is None:
-        return 0.0
-    cx_relativo, cy_relativo, area_relativa = pos
-
-    distancia_centro = ((cx_relativo - 0.5) ** 2 + (cy_relativo - 0.5) ** 2) ** 0.5
-    peso_elipse = max(0.0, min(1.0, (distancia_centro - _RAIO_ELIPSE) / 0.15))
-
-    peso_y = 1.0
-    if cy_relativo < _Y_MIN_SEGURO:
-        peso_y = max(0.0, 1 - (_Y_MIN_SEGURO - cy_relativo) / 0.1)
-    peso_x = 1.0
-    if cx_relativo > _X_MAX_SEGURO:
-        peso_x = max(0.0, 1 - (cx_relativo - _X_MAX_SEGURO) / 0.15)
-
-    return area_relativa * peso_elipse * peso_x * peso_y
+def _analisar(foto: dict) -> dict:
+    """Baixa a miniatura e detecta o rosto APROVEITÁVEL (existe, não é falso
+    positivo e cabe no anel). Falha ao baixar/decodificar = sem rosto (não
+    interrompe a geração, só tira a foto da disputa)."""
+    try:
+        dados = _baixar_bytes(foto.get("thumb") or foto["url"])
+        rosto = _detectar(_decodificar(dados, cv2.IMREAD_GRAYSCALE))
+    except Exception:
+        dados, rosto = None, None
+    if rosto is not None and (rosto.area < _AREA_MIN or rosto.largura_final > _LARGURA_FINAL_MAX):
+        rosto = None  # falso positivo provável, ou close-up que não enquadra
+    return {**foto, "rosto": rosto, "thumb_bytes": dados}
 
 
 def ordenar_por_rosto(pool: list[dict]) -> list[dict]:
-    """Recebe [{'id', 'url', 'thumb'}, ...] e devolve reordenado: rosto melhor
-    enquadrado primeiro. Cada item ganha a chave 'rosto' com
-    (cx_relativo, cy_relativo, area_relativa) do maior rosto detectado, ou
-    None se não achou nenhum — usado depois por `enquadrar`. Falha ao
-    baixar/decodificar uma foto = pontuação 0 (não interrompe a geração, só
-    perde prioridade). Ordem estável entre empates, então quem não tem rosto
-    detectado mantém a ordem de relevância original do Pexels.
+    """Recebe [{'id', 'url', 'thumb'}, ...] e devolve as fotos COM rosto detectado
+    na frente (maior rosto primeiro), seguidas das sem rosto na ordem original de
+    relevância. Cada item ganha 'rosto' (`Rosto` ou None) — usado por `enquadrar`
+    e por `sorteio.escolher_foto`, que só aceita fotos com rosto — e
+    'thumb_bytes' (miniatura crua, pra curadoria por visão).
     """
-    pontuados = []
-    for foto in pool:
-        try:
-            img = _baixar(foto.get("thumb") or foto["url"], cv2.IMREAD_GRAYSCALE)
-        except Exception:
-            img = None
-        pos = _detectar(img)
-        pontuados.append(({**foto, "rosto": pos}, _pontuar(pos)))
-    pontuados.sort(key=lambda par: par[1], reverse=True)
-    return [foto for foto, _ in pontuados]
+    with ThreadPoolExecutor(max_workers=8) as ex:
+        analisadas = list(ex.map(_analisar, pool))
+    com_rosto = sorted((f for f in analisadas if f["rosto"]), key=lambda f: f["rosto"].area, reverse=True)
+    sem_rosto = [f for f in analisadas if not f["rosto"]]
+    return com_rosto + sem_rosto
 
 
-# Alvo do centro do rosto dentro do container 1033×1033 — terço superior
-# esquerdo do anel visível (fora do círculo da elipse, com margem).
-_ALVO_X = 140
-_ALVO_Y = 280
+def candidatas_curadoria(pool: list[dict]) -> list[dict]:
+    """Fotos (já passadas por `ordenar_por_rosto`) que valem ir pra curadoria por visão."""
+    return [f for f in pool if f.get("rosto") and f.get("thumb_bytes")][:_MAX_CANDIDATAS_CURADORIA]
+
+
+# Alvo do rosto dentro do container (jpeg 1033×1033, que o CSS reescala pra 897).
+# Ponto: meio do anel visível à altura do rosto (canvas ≈ (800, 230)); largura da
+# caixa do Haar ~150px (≈130 no canvas) — a cabeça inteira, com cabelo, cabe
+# entre a borda do círculo e a elipse sem encostar em nenhuma.
 _CONTAINER = 1033
+_ALVO_X = 160
+_ALVO_Y = 331
+_ALVO_LARGURA = 150
+_ESCALA_MAX = 2.0  # não estica mais que isso só pra atingir o tamanho-alvo (pixeliza)
+# Parte do container que aparece no canvas (o resto sai pela direita/topo):
+_VIS_X_MAX = 420
+_VIS_Y_MIN = 66  # 57px do container 897 → 66 em 1033
 
 
-def _hex_para_bgr(cor_hex: str) -> tuple[int, int, int]:
-    cor_hex = cor_hex.lstrip("#")
-    r, g, b = int(cor_hex[0:2], 16), int(cor_hex[2:4], 16), int(cor_hex[4:6], 16)
-    return b, g, r
+def _plano(rosto: Rosto, largura_src: int, altura_src: int, limitar_upscale: bool = True) -> tuple[float, float]:
+    """(escala, largura final do rosto em px do container) pra encaixar o rosto
+    no alvo. A escala leva o rosto ao tamanho-alvo mas nunca fica abaixo da
+    necessária pra foto cobrir a área visível (senão sobra vazio nas bordas)."""
+    face_cx, face_cy = rosto.cx * largura_src, rosto.cy * altura_src
+    alvo = _ALVO_LARGURA / (rosto.largura * largura_src)
+    escala = min(alvo, _ESCALA_MAX) if limitar_upscale else alvo
+    escala = max(
+        escala,
+        _ALVO_X / face_cx,
+        (_VIS_X_MAX - _ALVO_X) / max(largura_src - face_cx, 1),
+        (_ALVO_Y - _VIS_Y_MIN) / face_cy,
+        (_CONTAINER - _ALVO_Y) / max(altura_src - face_cy, 1),
+    )
+    return escala, rosto.largura * largura_src * escala
 
 
-def enquadrar(foto: dict, cor_elipse_hex: str) -> str:
-    """Recorta/reamostra a foto escolhida pra deixar o rosto no terço
-    superior esquerdo do anel visível. Sem rosto detectado (foto['rosto'] is
-    None) ou em qualquer erro, devolve a URL original sem modificar — mesmo
-    comportamento de antes, sem interromper a geração.
+def enquadrar(foto: dict) -> str:
+    """Recorta/reamostra a foto escolhida pra deixar o rosto no anel visível, com
+    tamanho controlado. Sem rosto detectado (foto['rosto'] is None) ou em qualquer
+    erro, devolve a URL original sem modificar — sem interromper a geração.
     """
     pos = foto.get("rosto")
     if pos is None:
         return foto["url"]
     try:
-        img = _baixar(foto["url"], cv2.IMREAD_COLOR)
+        img = _decodificar(_baixar_bytes(foto["url"]), cv2.IMREAD_COLOR)
         altura_src, largura_src = img.shape[:2]
-        escala = _CONTAINER / largura_src
+        escala, _ = _plano(pos, largura_src, altura_src)
+        largura_esc = round(largura_src * escala)
         altura_esc = round(altura_src * escala)
-        img_esc = cv2.resize(img, (_CONTAINER, altura_esc), interpolation=cv2.INTER_AREA)
+        interp = cv2.INTER_AREA if escala < 1 else cv2.INTER_CUBIC
+        img_esc = cv2.resize(img, (largura_esc, altura_esc), interpolation=interp)
 
-        cx_relativo, cy_relativo, _ = pos
-        face_cx = cx_relativo * _CONTAINER
-        face_cy = cy_relativo * altura_esc
-        crop_x = round(face_cx - _ALVO_X)
-        crop_y = round(face_cy - _ALVO_Y)
+        crop_x = round(pos.cx * largura_esc - _ALVO_X)
+        crop_y = round(pos.cy * altura_esc - _ALVO_Y)
 
-        canvas = np.full((_CONTAINER, _CONTAINER, 3), _hex_para_bgr(cor_elipse_hex), dtype=np.uint8)
-        src_x0, src_y0 = max(0, crop_x), max(0, crop_y)
-        src_x1, src_y1 = min(_CONTAINER, crop_x + _CONTAINER), min(altura_esc, crop_y + _CONTAINER)
-        if src_x1 > src_x0 and src_y1 > src_y0:
-            dst_x0, dst_y0 = src_x0 - crop_x, src_y0 - crop_y
-            canvas[dst_y0 : dst_y0 + (src_y1 - src_y0), dst_x0 : dst_x0 + (src_x1 - src_x0)] = img_esc[
-                src_y0:src_y1, src_x0:src_x1
-            ]
+        # Recorta o container. A escala já garante cobertura; o padding só
+        # absorve 1px de arredondamento (replica a borda em vez de deixar vazio).
+        pad_esq, pad_topo = max(0, -crop_x), max(0, -crop_y)
+        pad_dir = max(0, crop_x + _CONTAINER - largura_esc)
+        pad_baixo = max(0, crop_y + _CONTAINER - altura_esc)
+        if pad_esq or pad_topo or pad_dir or pad_baixo:
+            img_esc = cv2.copyMakeBorder(img_esc, pad_topo, pad_baixo, pad_esq, pad_dir, cv2.BORDER_REPLICATE)
+            crop_x += pad_esq
+            crop_y += pad_topo
+        canvas = img_esc[crop_y : crop_y + _CONTAINER, crop_x : crop_x + _CONTAINER]
 
         ok, buf = cv2.imencode(".jpg", canvas, [cv2.IMWRITE_JPEG_QUALITY, 90])
         if not ok:
             return foto["url"]
         return "data:image/jpeg;base64," + base64.b64encode(buf).decode()
     except Exception:
+        log.exception("falha ao reenquadrar %s — usando a foto original", foto.get("id"))
         return foto["url"]

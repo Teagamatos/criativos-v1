@@ -55,7 +55,7 @@ Quem chama (n8n) já resolveu todos os dados da vaga. A API só orquestra:
    últimas N usadas);
 2. logo da contratante convertida pra PNG (`sigilosa=true` omite a logo);
 3. render HTML→PNG com Playwright/Chromium;
-4. anexo no card do ClickUp com "Gerado automaticamente" + timestamp.
+4. anexo no card do ClickUp (só o PNG, com timestamp no nome; sem comentário).
 
 Cada chamada gera **`CRIATIVOS_POR_VAGA` artes** (env, default 3): o endpoint
 dispara N execuções independentes desse pipeline, cada uma sorteando cor e foto

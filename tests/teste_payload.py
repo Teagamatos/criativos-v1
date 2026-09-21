@@ -13,7 +13,7 @@ import sys
 import unicodedata
 from pathlib import Path
 
-from app import logo, openai_client, pexels, render, rosto, sorteio
+from app import logo, openai_client, pexels, pipeline, render, rosto, sorteio
 
 SAIDA_DIR = Path(__file__).resolve().parent.parent / "_teste_fotos"
 
@@ -40,16 +40,17 @@ async def gerar(dados: dict) -> Path:
 
     combinacao = sorteio.sortear_combinacao()
     contexto = {"segmento": vaga["segmento"], "empresa": vaga["empresa"], "nivel": vaga["nivel"]}
-    query = await openai_client.gerar_query_foto(vaga["titulo"], contexto) or f"{vaga['titulo']} portrait"
-    print(f"query Pexels: {query!r}")
+    queries = await openai_client.gerar_queries_foto(vaga["titulo"], contexto) or [f"{vaga['titulo']} portrait"]
+    print(f"queries: {queries!r}")
 
-    pool = await asyncio.to_thread(pexels.buscar_fotos, query)
+    pool = await asyncio.to_thread(pipeline.buscar_pool, pexels, queries)
     if not pool:
-        raise SystemExit(f"Pexels não retornou nenhuma foto pra query {query!r}")
+        raise SystemExit(f"Pexels nao retornou nenhuma foto pras queries {queries!r}")
     pool = await asyncio.to_thread(rosto.ordenar_por_rosto, pool)
-    foto = sorteio.escolher_foto(pool)
-    print(f"foto escolhida: {foto['id']} - rosto detectado: {foto.get('rosto') is not None}")
-    foto_uri = await asyncio.to_thread(rosto.enquadrar, foto, combinacao["elipse"])
+    notas = await openai_client.curar_fotos(vaga["titulo"], contexto, rosto.candidatas_curadoria(pool))
+    foto = sorteio.escolher_foto(pool, notas)
+    print(f"foto escolhida: {foto['id']} - nota: {(notas or {}).get(foto['id'])} - rosto detectado: {foto.get('rosto') is not None}")
+    foto_uri = await asyncio.to_thread(rosto.enquadrar, foto)
 
     html = render.montar_html(vaga, combinacao, foto_uri, logo_empresa, sigilosa)
     png = await render.render_png(html)

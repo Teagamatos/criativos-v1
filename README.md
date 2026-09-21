@@ -5,13 +5,14 @@ Reescrita em Python do fluxo de geração automática de artes de vaga Salesjobs
 dados da vaga já resolvidos por quem chama (n8n) — cargo, segmento, empresa,
 nível, localizações, se é sigilosa, o `task` (ID do card no ClickUp) e a URL
 da logo da contratante — e cuida do resto: sorteio de cor (paleta oficial do
-Figma) e foto (busca dinâmica na Pexels, com query gerada por GPT a partir do
-cargo/contexto da vaga, excluindo as últimas N usadas), conversão da logo pra
-PNG, render HTML→PNG 1080×1350 e anexo no card do ClickUp com "Gerado
-automaticamente" + timestamp. Cada chamada dispara `CRIATIVOS_POR_VAGA`
-pipelines independentes (default 3) — cada um sorteia cor/foto próprias e
-anexa uma arte no card. Falhas técnicas: retry 3x com backoff; persistindo,
-comenta no card, loga o traceback e notifica o Discord (bot API —
+Figma) e foto (busca dinâmica na Pexels/Unsplash, com queries geradas por GPT a
+partir do cargo/contexto da vaga e curadoria por visão das candidatas, excluindo
+as últimas N usadas), conversão da logo pra
+PNG, render HTML→PNG 1080×1350 e anexo no card do ClickUp (só o PNG, com
+timestamp no nome — sem comentário, pra não poluir o card). Cada chamada
+dispara `CRIATIVOS_POR_VAGA` pipelines independentes (default 3) — cada um
+sorteia cor/foto próprias e anexa uma arte no card. Falhas técnicas: retry 3x
+com backoff; persistindo, comenta o erro no card, loga o traceback e notifica o Discord (bot API —
 `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`). Sem dedup entre chamadas.
 
 ## Rodando
@@ -48,11 +49,12 @@ flowchart TD
     SIG -.->|"sim"| SEMLOGO["sem logo"]
 
     P --> SORT["sorteio.sortear_combinacao()\n← paleta-salesjobs.json"]
-    P --> GPT["openai_client.gerar_query_foto()\n← cargo + segmento/empresa/nível"]
-    GPT --> PX["pexels.buscar_fotos(query)"]
-    PX --> ROSTO1["rosto.ordenar_por_rosto(pool)\nOpenCV: prioriza rosto visível"]
-    ROSTO1 --> ESC["sorteio.escolher_foto(pool)\n← exclui últimas N (state.db)"]
-    ESC --> ROSTO2["rosto.enquadrar(foto, cor_elipse)\nOpenCV: recorta/reposiciona rosto"]
+    P --> GPT["openai_client.gerar_queries_foto()\n← cargo (manda) + segmento/empresa/nível (só cenário)\n→ 2 queries: com cenário + genérica do cargo"]
+    GPT --> PX["pipeline.buscar_pool(provider, queries)\nPexels ou Unsplash, intercala e deduplica"]
+    PX --> ROSTO1["rosto.ordenar_por_rosto(pool)\nOpenCV: descarta sem rosto / close-up demais"]
+    ROSTO1 --> CUR["openai_client.curar_fotos()\nGPT visão: nota 0-10 por miniatura"]
+    CUR --> ESC["sorteio.escolher_foto(pool, notas)\n← exclui últimas N (state.db); maior nota"]
+    ESC --> ROSTO2["rosto.enquadrar(foto)\nOpenCV: rosto com tamanho e posição controlados"]
 
     LOGO --> R["render.montar_html()\nJinja2 + template Figma"]
     SEMLOGO --> R
@@ -61,7 +63,6 @@ flowchart TD
     R --> PNG["render.render_png()\nPlaywright/Chromium 1080×1350"]
 
     PNG --> AT["clickup.attach_file(task, png)"]
-    AT --> CM["clickup.post_comment(task)\n'Gerado automaticamente' + timestamp"]
 
     P -.->|"exceção em qualquer etapa"| ERR["log.exception (traceback no stdout)\n+ comenta no card\n+ notify.erro_discord (bot API — content + embed com traceback)"]
 ```
@@ -83,14 +84,17 @@ resultado.
     app/logo.py      baixa a URL da logo (sem extensão) e reencoda como PNG via
                      OpenCV — não depende do Content-Type/extensão da URL
     app/pexels.py    busca de fotos na Pexels API (query dinâmica, URL pública)
-    app/openai_client.py  GPT: gera a query de busca da foto (Pexels) por cargo/contexto
-    app/rosto.py     reordena o pool do Pexels priorizando rosto visível E
-                     reenquadra a foto vencedora (recorte/preenchimento no
-                     servidor) pra garantir o rosto no lugar certo do anel —
-                     OpenCV, detecção local sem custo de API; ver comentário
-                     do módulo pra geometria do recorte do template
-    app/sorteio.py   random.choice da combinação de cor; foto = top do pool Pexels
-                     já reordenado por rosto.py (exclui últimas N usadas)
+    app/unsplash.py  idem, na Unsplash API (metade das artes de cada vaga)
+    app/openai_client.py  GPT: gera 2 queries de busca da foto (cargo manda, segmento
+                     só dá cenário) e faz a curadoria por visão das miniaturas
+                     (nota 0-10; sem pessoa/rosto visível/cigarro/marca = 0)
+    app/rosto.py     descarta do pool foto sem rosto detectável (ou close-up que
+                     não cabe no anel), guarda as miniaturas pra curadoria e
+                     reenquadra a foto vencedora (rosto no anel, tamanho
+                     controlado) — OpenCV, detecção local sem custo de API; ver
+                     comentário do módulo pra geometria do recorte do template
+    app/sorteio.py   random.choice da combinação de cor; foto = maior nota da
+                     curadoria entre as com rosto (exclui últimas N usadas)
     app/state.py     SQLite: fotos usadas entre execuções (STATE_DB → volume!)
     app/render.py    Jinja2 + Playwright (Chromium singleton, retry 3x)
     templates/       template capturado do Figma (1080×1350, Open Sans)
@@ -142,7 +146,35 @@ resultado.
      bem mais alta.
 
   Ainda não é 100% garantido: cargos de nicho às vezes não têm nenhum
-  candidato com rosto detectável no banco do Pexels.
+  candidato com rosto detectável no banco de imagens.
+- **Fotos ruins em produção** (payload "Vendedor Técnico Externo / Máquinas e
+  equipamentos": operário de fábrica, painel de máquina sem pessoa, rosto
+  cortado pelo círculo). Causas e correções:
+  1. *Query enviesada pelo segmento* — o prompt mandava "cenário do setor" e o
+     GPT devolvia `... portrait factory`. Agora o CARGO manda (cargo comercial =
+     vendedor de terno, mesmo que a empresa venda máquinas), o segmento só dá
+     cenário, e são 2 queries (uma com cenário, outra genérica do cargo).
+  2. *Foto sem rosto passava* — `ordenar_por_rosto` só reordenava. Agora quem
+     não tem rosto detectável (ou é close-up que estouraria o anel) fica fora.
+  3. *Ninguém julgava o conteúdo* — Haar não distingue vendedor de operário nem
+     vê cigarro/painel. Agora `curar_fotos` (GPT visão, `gpt-5-mini`) nota as
+     candidatas e o sorteio leva a de maior nota.
+  4. *Rosto gigante/cortado* — o zoom forçado pela cobertura podia passar de 2×.
+     `enquadrar` agora mira uma largura de rosto fixa e descarta o que exigiria
+     mais que `_LARGURA_FINAL_MAX`.
+  5. *Bug de thread* — `CascadeClassifier` não é thread-safe; a detecção
+     concorrente inventava rostos. Detecção serializada com lock (download segue
+     paralelo).
+  6. *Operário de capacete passando como vendedor* — depois de publicar no card
+     `86akknjjt`, uma foto de operário (colete refletivo) tirou nota 9 porque a
+     query trouxe `construction site` e o prompt deixava o segmento "compensar".
+     Ajuste: para cargo comercial, query só com cenário de negócios (sem
+     construction/site/worker/factory) e curadoria com teto de nota 3 pra
+     capacete/colete/uniforme — regra que NÃO vale pra cargo operacional
+     (mesma foto: nota 2–3 como vendedor, 9–10 como mecânico).
+  Sem `OPENAI_API_KEY` (ou erro na OpenAI) cai em `"{cargo} portrait"` + só o
+  filtro de rosto — pior, mas nunca trava a arte. Custo: +1 chamada de visão por
+  arte (~16 miniaturas em `detail: low`) e ~20-30s a mais por arte.
 - **Payload completo em `/generate`** — quem chama (n8n) já resolve os dados
   da vaga (cargo, segmento, empresa, nível, localizações, sigilosa, task,
   logo) num único payload; removida a busca em Foursales (`vaga.py`) e o

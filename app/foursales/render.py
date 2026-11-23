@@ -46,7 +46,9 @@ CSS = f"""
 * {{ margin: 0; padding: 0; box-sizing: border-box; }}
 body {{ font-family: LF, sans-serif; -webkit-print-color-adjust: exact; print-color-adjust: exact; }}
 .sheet {{ width: 1080px; height: 1350px; overflow: hidden; position: relative; page-break-after: always; }}
-.page {{ width: {FW}px; height: {FH}px; position: absolute; left: 0; top: 0; transform-origin: 0 0; transform: scale({1080 / FW}); overflow: hidden; }}
+/* zoom (e não transform): no modo de impressão o Chrome pagina pelo layout SEM o
+   transform, e tudo abaixo de 1350px do frame original era cortado do PDF */
+.page {{ width: {FW}px; height: {FH}px; position: absolute; left: 0; top: 0; zoom: {1080 / FW}; overflow: hidden; }}
 .abs {{ position: absolute; }}
 .bg {{ position: absolute; left: -5.327px; top: 0; width: 1448.198px; height: {FH}px; object-fit: cover; }}
 .eyebrow {{ color: {GOLD}; font-size: 32.7px; letter-spacing: .40em; line-height: 51px; text-transform: uppercase; white-space: nowrap; }}

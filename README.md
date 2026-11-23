@@ -15,6 +15,31 @@ sorteia cor/foto próprias e anexa uma arte no card. Falhas técnicas: retry 3x
 com backoff; persistindo, comenta o erro no card, loga o traceback e notifica o Discord (bot API —
 `DISCORD_BOT_TOKEN` + `DISCORD_CHANNEL_ID`). Sem dedup entre chamadas.
 
+## Foursales — PDF de divulgação (LAB-2239)
+
+`POST /generate-foursales` (mesmo Bearer `GENERATE_TOKEN`) gera o PDF de 3 páginas
+do template "TEMPLATE VAGAS - LINKEDIN" do Figma e anexa no card, com o comentário
+"Gerado automaticamente" + data/hora. Payload resolvido pelo n8n:
+
+    {"task": "86ajj8ptg", "cargo": "Head de Vendas", "segmento": "Saúde",
+     "localizacoes": ["São Paulo, SP"], "modelo": "Híbrido", "desafio": "...", "nivel": "Diretor"}
+
+- foto: mesma busca do Salesjobs (Pexels + Unsplash, queries e curadoria por GPT,
+  exclui as últimas N), com critérios da capa (uma pessoa, colorida, roupa social,
+  espaço acima da cabeça, sem close-up);
+- capa: foto com o cenário original sobre o fundo do template, desfocada perto da
+  linha dourada; cabeça/ombros por cima do painel; linha e faixas da frente por cima
+  de tudo (assets em `templates/foursales/`, código em `app/foursales/`);
+- título: tira a localização colada no fim ("Gerente Marketing - Biguaçu (SC)");
+  segmento com mais de 30 caracteres é resumido por GPT (fallback: corta no 1º separador);
+- `modelo` vazio → a linha é omitida; `cargo`/`segmento`/`localizacoes`/`desafio`
+  ausentes → comentário no card dizendo o que falta, sem erro;
+- nunca usa nome nem logo da contratante.
+
+Teste local sem rede/ClickUp: `python -m tests.teste_foursales foto1.jpg foto2.jpg`
+(salva os PDFs em `tests/payloads/`; use `CHROME_PATH=` se o Chromium do Playwright
+não estiver instalado). Fonte do template: Libre Franklin (OFL), embutida.
+
 ## Rodando
 
     pip install -r requirements.txt

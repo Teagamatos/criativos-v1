@@ -13,3 +13,4 @@ _teste_*/
 !templates/**
 
 tests/payloads/*.json
+tests/payloads/foursales-*

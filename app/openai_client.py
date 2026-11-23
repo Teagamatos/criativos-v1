@@ -99,11 +99,12 @@ async def _chat(
         return None
 
 
-async def gerar_queries_foto(cargo: str, contexto: dict) -> list[str]:
+async def gerar_queries_foto(cargo: str, contexto: dict, instrucoes: str | None = None) -> list[str]:
     """Até 2 queries de busca (em inglês) para o cargo, considerando o contexto da vaga.
-    Lista vazia quando a OpenAI não responde — o chamador cai no fallback."""
+    Lista vazia quando a OpenAI não responde — o chamador cai no fallback.
+    `instrucoes` troca o prompt padrão (Salesjobs) — usado pelo fluxo Foursales."""
     out = await _chat(
-        _INSTRUCOES_FOTO,
+        instrucoes or _INSTRUCOES_FOTO,
         json.dumps({"contexto": contexto, "cargo": cargo}, ensure_ascii=False),
         reasoning_effort="low",
     )
@@ -113,7 +114,9 @@ async def gerar_queries_foto(cargo: str, contexto: dict) -> list[str]:
     return [q.strip() for q in queries if isinstance(q, str) and q.strip()][:2]
 
 
-async def curar_fotos(cargo: str, contexto: dict, fotos: list[dict]) -> dict[str, int] | None:
+async def curar_fotos(
+    cargo: str, contexto: dict, fotos: list[dict], instrucoes: str | None = None
+) -> dict[str, int] | None:
     """Nota 0-10 por foto (chave = id) segundo o modelo de visão, ou None se a
     curadoria não rodou (sem chave/erro). Cada foto precisa de 'thumb_bytes'
     (JPEG/PNG da miniatura, baixado pelo rosto.py) — vai embutido em base64 pra
@@ -132,7 +135,7 @@ async def curar_fotos(cargo: str, contexto: dict, fotos: list[dict]) -> dict[str
         return None
 
     out = await _chat(
-        _INSTRUCOES_CURADORIA,
+        instrucoes or _INSTRUCOES_CURADORIA,
         partes,
         modelo=_MODEL_VISAO,
         reasoning_effort="low",
@@ -143,3 +146,8 @@ async def curar_fotos(cargo: str, contexto: dict, fotos: list[dict]) -> dict[str
     if not isinstance(notas, dict):
         return None
     return {str(i): int(n) for i, n in notas.items() if isinstance(n, (int, float))}
+
+
+async def resumir(instrucoes: str, texto: str) -> dict | None:
+    """Chamada genérica curta (JSON) — usada pelo fluxo Foursales pra encurtar segmento."""
+    return await _chat(instrucoes, texto, reasoning_effort="low", max_completion_tokens=2000, timeout=20)

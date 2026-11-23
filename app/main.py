@@ -22,6 +22,7 @@ from pydantic import BaseModel, Field
 
 from . import config, notify, render
 from .pipeline import processar
+from .foursales import pipeline as foursales
 
 
 def _configurar_logs() -> None:
@@ -196,6 +197,45 @@ async def generate(
     providers = ["pexels"] * n_pexels + ["unsplash"] * (n - n_pexels)
     for provider in providers:
         background.add_task(processar, dados, provider)
+    return AceitoResponse(status="accepted")
+
+
+class VagaFoursalesPayload(BaseModel):
+    """Dados da vaga Foursales já resolvidos pelo n8n (LAB-2239)."""
+
+    task: str = Field(..., description="ID do card no ClickUp onde o PDF é anexado.", examples=["86ajj8ptg"])
+    cargo: str | None = Field(None, description="Título da vaga (a localização colada no fim é removida).", examples=["Head de Vendas"])
+    segmento: str | None = Field(None, description="Segmento da empresa; nomes longos são encurtados.", examples=["Bens de Consumo"])
+    localizacoes: list[str] = Field(default_factory=list, description="'Cidade, UF' ou 'Cidade | UF'.", examples=[["São Paulo, SP"]])
+    desafio: str | None = Field(None, description="Texto da seção 'O desafio' (resumo da vaga).")
+    modelo: str | None = Field(None, description="Remoto / Híbrido / Presencial. Vazio: a linha é omitida.", examples=["Híbrido"])
+    nivel: str | None = Field(None, description="Nível/senioridade — só contexto pra busca da foto.")
+
+
+@app.post(
+    "/generate-foursales",
+    status_code=202,
+    tags=["geração"],
+    summary="Gera o PDF de divulgação Foursales (3 páginas) e anexa no card",
+    description=(
+        "Responde na hora e processa em *background*: escolhe a foto (Pexels/Unsplash + curadoria), "
+        "monta a capa sobre o template do Figma, renderiza o PDF e anexa no card com o comentário "
+        "'Gerado automaticamente'. Dado obrigatório ausente vira comentário no card (sem erro). "
+        "Nunca usa nome nem logo da contratante."
+    ),
+    response_model=AceitoResponse,
+    responses={401: {"description": "Token ausente ou inválido."}},
+)
+async def generate_foursales(
+    background: BackgroundTasks,
+    _: None = Depends(verificar_token),
+    payload: VagaFoursalesPayload | list[VagaFoursalesPayload] = Body(...),
+) -> AceitoResponse:
+    if isinstance(payload, list):
+        if not payload:
+            raise HTTPException(status_code=422, detail="lista de vagas vazia")
+        payload = payload[0]
+    background.add_task(foursales.processar, payload.model_dump())
     return AceitoResponse(status="accepted")
 
 

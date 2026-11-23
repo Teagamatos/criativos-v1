@@ -9,3 +9,4 @@ tenacity>=9.0
 playwright==1.62.0                  # TEM que bater com a tag da base no Dockerfile
 opencv-python-headless>=4.10,<5
 numpy>=1.26                         # np.frombuffer/np.full em app/logo.py e app/rosto.py (vem via opencv, mas é import direto)
+tzdata>=2024.1                      # zoneinfo America/Sao_Paulo (data/hora do comentário Foursales)

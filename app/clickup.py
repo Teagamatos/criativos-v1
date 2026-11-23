@@ -21,11 +21,16 @@ async def post_comment(task_id: str, texto: str) -> None:
         r.raise_for_status()
 
 
-async def attach_file(task_id: str, filename: str, content: bytes) -> None:
+async def attach_file(task_id: str, filename: str, content: bytes, content_type: str = "image/png") -> dict:
+    """Anexa o arquivo no card. Devolve o JSON do ClickUp (tem a `url` do anexo)."""
     async with httpx.AsyncClient(timeout=60) as cli:
         r = await cli.post(
             f"{BASE}/task/{task_id}/attachment",
             headers=_HEADERS,
-            files={"attachment": (filename, content, "image/png")},
+            files={"attachment": (filename, content, content_type)},
         )
         r.raise_for_status()
+        try:
+            return r.json()
+        except ValueError:
+            return {}
